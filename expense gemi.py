@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 from datetime import datetime
-from fpdf import FPDF
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder,
@@ -19,7 +18,8 @@ from telegram.ext import (
 import matplotlib
 matplotlib.use('Agg')
 
-TOKEN = '8763922352:AAG7_FAZiG_GfQze7Z098bqJUpzTANwL9bU'
+# --- ပြင်ဆင်ချက် ၁: Token ကို Environment Variable ကနေ ယူခြင်း ---
+TOKEN = os.getenv('BOT_TOKEN')
 
 # States
 CHOOSING, TYPING_AMOUNT, CHOOSING_CATEGORY = range(3)
@@ -51,7 +51,7 @@ def main_menu_keyboard():
     return ReplyKeyboardMarkup([
         [KeyboardButton("📊 Graph ပြရန်"), KeyboardButton("💰 အနှစ်ချုပ် ကြည့်ရန်")],
         [KeyboardButton("📝 ငွေဝင် မှတ်ရန်"), KeyboardButton("💸 ငွေထွက် မှတ်ရန်")],
-        [KeyboardButton("📄 PDF Report ထုတ်ရန်"), KeyboardButton("🗑️ Reset (အားလုံးဖျက်ရန်)")]
+        [KeyboardButton("🗑️ Reset (အားလုံးဖျက်ရန်)")]
     ], resize_keyboard=True)
 
 def category_keyboard(categories):
@@ -122,14 +122,16 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def receive_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        amount = float(update.message.text.replace(',', ''))
+        # ကော်မာ ပါလာရင်လည်း ဖယ်ထုတ်ပြီး တွက်နိုင်အောင် ပြင်ထားပါတယ်
+        clean_amount = update.message.text.replace(',', '')
+        amount = float(clean_amount)
         context.user_data['amount'] = amount
         t_type = context.user_data.get('type')
         cats = INCOME_CATEGORIES if t_type == 'income' else EXPENSE_CATEGORIES
-        await update.message.reply_text("Category ရွေးပါ-", reply_markup=category_keyboard(cats))
+        await update.message.reply_text(f"အမျိုးအစား ရွေးပါ-", reply_markup=category_keyboard(cats))
         return CHOOSING_CATEGORY
-    except:
-        await update.message.reply_text("ဂဏန်းပဲ ရိုက်ပေးပါ!")
+    except ValueError:
+        await update.message.reply_text("ကျေးဇူးပြု၍ ဂဏန်းသီးသန့် (ဥပမာ - 5000) ရိုက်ပေးပါ!")
         return TYPING_AMOUNT
 
 async def receive_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -139,24 +141,29 @@ async def receive_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     t_type = context.user_data.get('type')
 
     add_transaction(user_id, t_type, amt, cat)
-    await update.message.reply_text(f"✅ မှတ်သားပြီးပါပြီ။", reply_markup=main_menu_keyboard())
+    await update.message.reply_text(f"✅ {cat} အတွက် {amt:,.0f} မှတ်သားပြီးပါပြီ။", reply_markup=main_menu_keyboard())
     return CHOOSING
 
 if __name__ == '__main__':
     init_db()
-    app = ApplicationBuilder().token(TOKEN).build()
     
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)], # MessageHandler ကို ဒီထဲကနေ ဖယ်လိုက်ပါ
-        states={
-            CHOOSING: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_choice)],
-            TYPING_AMOUNT: [MessageHandler(filters.TEXT & (~filters.COMMAND), receive_amount)],
-            CHOOSING_CATEGORY: [MessageHandler(filters.TEXT & (~filters.COMMAND), receive_category)],
-        },
-        fallbacks=[CommandHandler('start', start)],
-        allow_reentry=True
-    )
-    
-    app.add_handler(conv_handler)
-    print("Bot is running...")
-    app.run_polling(drop_pending_updates=True)
+    # --- ပြင်ဆင်ချက် ၂: Token မရှိရင် Error ပေးအောင် လုပ်ထားခြင်း ---
+    if not TOKEN:
+        print("Error: BOT_TOKEN environment variable မရှိပါ။ Railway Variables မှာ ထည့်ပေးပါ။")
+    else:
+        app = ApplicationBuilder().token(TOKEN).build()
+        
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('start', start), MessageHandler(filters.TEXT & (~filters.COMMAND), start)],
+            states={
+                CHOOSING: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_choice)],
+                TYPING_AMOUNT: [MessageHandler(filters.TEXT & (~filters.COMMAND), receive_amount)],
+                CHOOSING_CATEGORY: [MessageHandler(filters.TEXT & (~filters.COMMAND), receive_category)],
+            },
+            fallbacks=[CommandHandler('start', start)],
+            allow_reentry=True
+        )
+        
+        app.add_handler(conv_handler)
+        print("Bot is running...")
+        app.run_polling(drop_pending_updates=True)
