@@ -154,15 +154,15 @@ if __name__ == '__main__':
         app = ApplicationBuilder().token(TOKEN).build()
         
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler('start', start), MessageHandler(filters.TEXT & (~filters.COMMAND), start)],
-            states={
-                CHOOSING: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_choice)],
-                TYPING_AMOUNT: [MessageHandler(filters.TEXT & (~filters.COMMAND), receive_amount)],
-                CHOOSING_CATEGORY: [MessageHandler(filters.TEXT & (~filters.COMMAND), receive_category)],
-            },
-            fallbacks=[CommandHandler('start', start)],
-            allow_reentry=True
-        )
+    entry_points=[CommandHandler('start', start)], # MessageHandler ကို ဒီထဲကနေ ဖယ်လိုက်ပါ
+    states={
+        CHOOSING: [MessageHandler(filters.TEXT & (~filters.COMMAND), handle_choice)],
+        TYPING_AMOUNT: [MessageHandler(filters.TEXT & (~filters.COMMAND), receive_amount)],
+        CHOOSING_CATEGORY: [MessageHandler(filters.TEXT & (~filters.COMMAND), receive_category)],
+    },
+    fallbacks=[CommandHandler('start', start)],
+    allow_reentry=True
+)
         
         app.add_handler(conv_handler)
         print("Bot is running...")
