@@ -104,12 +104,36 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif "အနှစ်ချုပ်" in text:
         df = get_summary(user_id)
-        income = df[df['type'] == 'income']['amount'].sum()
-        expense = df[df['type'] == 'expense']['amount'].sum()
-        await update.message.reply_text(
-            f"💰 **အနှစ်ချုပ်**\n📈 ဝင်ငွေ: {income:,.0f}\n📉 ထွက်ငွေ: {expense:,.0f}\n💵 လက်ကျန်: {income-expense:,.0f}",
-            parse_mode='Markdown', reply_markup=main_menu_keyboard()
-        )
+        if df.empty:
+            await update.message.reply_text("မှတ်တမ်း မရှိသေးပါ။")
+            return CHOOSING
+
+        # စုစုပေါင်း တွက်ချက်ခြင်း
+        income_total = df[df['type'] == 'income']['amount'].sum()
+        expense_total = df[df['type'] == 'expense']['amount'].sum()
+        balance = income_total - expense_total
+
+        # Category အလိုက် အသေးစိတ် ခွဲထုတ်ခြင်း
+        summary_text = f"💰 **အနှစ်ချုပ် အစီရင်ခံစာ**\n"
+        summary_text += f"━━━━━━━━━━━━━━━\n"
+        summary_text += f"📈 **ဝင်ငွေစုစုပေါင်း:** {income_total:,.0f}\n"
+        
+        # ဝင်ငွေ Category များ
+        income_df = df[df['type'] == 'income'].groupby('category')['amount'].sum()
+        for cat, amt in income_df.items():
+            summary_text += f"  ▫️ {cat}: {amt:,.0f}\n"
+
+        summary_text += f"\n📉 **ထွက်ငွေစုစုပေါင်း:** {expense_total:,.0f}\n"
+        
+        # ထွက်ငွေ Category များ
+        expense_df = df[df['type'] == 'expense'].groupby('category')['amount'].sum()
+        for cat, amt in expense_df.items():
+            summary_text += f"  ▫️ {cat}: {amt:,.0f}\n"
+
+        summary_text += f"━━━━━━━━━━━━━━━\n"
+        summary_text += f"💵 **လက်ကျန်ငွေ:** {balance:,.0f}"
+
+        await update.message.reply_text(summary_text, parse_mode='Markdown', reply_markup=main_menu_keyboard())
         return CHOOSING
 
     elif "Reset" in text:
